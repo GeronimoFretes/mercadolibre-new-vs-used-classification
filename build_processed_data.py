@@ -23,7 +23,7 @@ TARGET = "condition"
 
 df_train = pd.read_parquet(
     TRAIN_DATA_PATH, 
-    lines=True, 
+     
     convert_dates=DATE_COLS
 )
 
