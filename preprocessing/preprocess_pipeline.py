@@ -73,11 +73,43 @@ def _host(url):
         return ""
     return url.split("://", 1)[1].split("/", 1)[0].lower()
 
-def _safe_list(x):
-    return x if isinstance(x, list) else ([] if pd.notna(x) else [])
-
 def _as_set(L):
     return set(L) if isinstance(L, list) else set()
+
+def _safe_join_tags(x):
+    if not isinstance(x, dict):
+        return pd.NA
+
+    tags = x.get("tags", None)
+
+    if tags is None:
+        return pd.NA
+
+    if isinstance(tags, np.ndarray):
+        tags = tags.tolist()
+
+    if isinstance(tags, (list, tuple, set)):
+        tags = [str(t) for t in tags if pd.notna(t)]
+        return "+".join(tags) if len(tags) > 0 else pd.NA
+
+    if isinstance(tags, str):
+        return tags if tags.strip() else pd.NA
+
+    return pd.NA
+
+def _safe_iterable(x):
+    if x is None:
+        return []
+    if isinstance(x, np.ndarray):
+        return x.tolist()
+    if isinstance(x, (list, tuple)):
+        return x
+    try:
+        if pd.isna(x):
+            return []
+    except Exception:
+        pass
+    return []
 
 # =========================
 # Base Frozen Transformer
@@ -326,7 +358,7 @@ class ShippingFeatureBuilder(FrozenTransformer):
         col = self.col
         out = pd.DataFrame(index=df.index)
         out['shipping_mode'] = df[col].apply(lambda x: x.get('mode') if isinstance(x, dict) else pd.NA)
-        out['shipping_tags'] = df[col].apply(lambda x: '+'.join(x.get('tags')) if isinstance(x, dict) and x.get('tags') else pd.NA)
+        out["shipping_tags"] = df[col].apply(_safe_join_tags)
         out['local_pick_up'] = df[col].apply(lambda x: x.get('local_pick_up') if isinstance(x, dict) else False).astype('uint8')
         out['has_methods']   = df[col].apply(lambda x: x.get('methods', None) is not None if isinstance(x, dict) else False).astype('uint8')
         out['free_shipping_methods'] = df[col].apply(lambda x: '-'.join(str(m['id']) for m in x.get('free_methods')) if isinstance(x, dict) and x.get('free_methods') is not None else pd.NA)
@@ -342,17 +374,36 @@ class ShippingFeatureBuilder(FrozenTransformer):
 # =========================
 
 def _pm_to_ids(x):
+    if x is None or x is pd.NA:
+        return []
+
+    if isinstance(x, np.ndarray):
+        x = x.tolist()
+
+    if not isinstance(x, (list, tuple)):
+        return []
+
     ids = []
-    for d in (x or []):
+    for d in x:
         if isinstance(d, dict):
-            pid = d.get("id")
-            if isinstance(pid, str):
-                ids.append(pid)
+            val = d.get("id")
+            if val is not None and pd.notna(val):
+                ids.append(str(val))
+
     return ids
 
 def _pm_to_types(x):
+    if x is None or x is pd.NA:
+        return []
+
+    if isinstance(x, np.ndarray):
+        x = x.tolist()
+
+    if not isinstance(x, (list, tuple)):
+        return []
+    
     tps = []
-    for d in (x or []):
+    for d in x:
         if isinstance(d, dict):
             t = d.get("type")
             if isinstance(t, str):
@@ -431,7 +482,7 @@ class PaymentMethodsFeatureBuilder(FrozenTransformer):
 
         # Type counts/shares
         for t in ["C","D","G","N"]:
-            out[f"count_type_{t}"] = df[col].apply(lambda L, tt=t: sum(1 for d in (L or []) if isinstance(d, dict) and d.get("type")==tt))
+            out[f"count_type_{t}"] = df[col].apply(lambda L, tt=t: sum(1 for d in _safe_iterable(L) if isinstance(d, dict) and d.get("type")==tt))
         out["count_cards"] = out["count_type_C"] + out["count_type_D"] + out["has_generic_credit"].astype(int)
         out["has_any_card"] = out["count_cards"] > 0
         den = out["payment_methods_count"].replace(0, np.nan)
@@ -501,7 +552,7 @@ class VariationsFeatureBuilder(FrozenTransformer):
         attr_names = set()
         values_per_attr = defaultdict(set)
         total_attr_items = 0
-        for v in (L or []):
+        for v in _safe_iterable(L):
             if not isinstance(v, dict): 
                 continue
             for a in _iter_attr_combos(v):
@@ -517,7 +568,7 @@ class VariationsFeatureBuilder(FrozenTransformer):
     @staticmethod
     def _aw_mean(L):
         pairs=[]
-        for v in (L or []):
+        for v in _safe_iterable(L):
             if not isinstance(v, dict): continue
             p=_clean_number(v.get('price'))
             q=_clean_number(v.get('available_quantity'))
@@ -530,7 +581,7 @@ class VariationsFeatureBuilder(FrozenTransformer):
     @staticmethod
     def _price_variation_by_attr(L, target_attr_name):
         buckets=defaultdict(list)
-        for v in (L or []):
+        for v in _safe_iterable(L):
             p=_clean_number(v.get('price'))
             if np.isnan(p): continue
             vals=[a for a in _iter_attr_combos(v) if a.get('name')==target_attr_name]
@@ -566,9 +617,9 @@ class VariationsFeatureBuilder(FrozenTransformer):
         out["has_variations"]  = df[col].apply(lambda L: isinstance(L, list) and len(L)!=0)
         out["variation_count"] = df[col].apply(lambda L: len(L) if isinstance(L, list) else 0)
 
-        prices = df[col].apply(lambda L: [x for x in (_clean_number(v.get('price')) for v in (L or []) if isinstance(v, dict)) if not np.isnan(x)])
-        avails = df[col].apply(lambda L: [x for x in (_clean_number(v.get('available_quantity')) for v in (L or []) if isinstance(v, dict)) if not np.isnan(x)])
-        solds  = df[col].apply(lambda L: [x for x in (_clean_number(v.get('sold_quantity')) for v in (L or []) if isinstance(v, dict)) if not np.isnan(x)])
+        prices = df[col].apply(lambda L: [x for x in (_clean_number(v.get('price')) for v in _safe_iterable(L) if isinstance(v, dict)) if not np.isnan(x)])
+        avails = df[col].apply(lambda L: [x for x in (_clean_number(v.get('available_quantity')) for v in _safe_iterable(L) if isinstance(v, dict)) if not np.isnan(x)])
+        solds  = df[col].apply(lambda L: [x for x in (_clean_number(v.get('sold_quantity')) for v in _safe_iterable(L) if isinstance(v, dict)) if not np.isnan(x)])
 
         out["price_min"] = prices.apply(lambda xs: _safe_stat(xs, min))
         out["price_max"] = prices.apply(lambda xs: _safe_stat(xs, max))
@@ -585,7 +636,7 @@ class VariationsFeatureBuilder(FrozenTransformer):
         out["stock_max_available"]   = avails.apply(lambda xs: _safe_stat(xs, max, 0.0))
         out["stock_min_available"]   = avails.apply(lambda xs: _safe_stat(xs, min, 0.0))
         out["stock_mean_available"]  = avails.apply(lambda xs: _safe_stat(xs, mean, 0.0))
-        out["has_oos_variants"]      = df[col].apply(lambda L: any((isinstance(v, dict) and _clean_number(v.get('available_quantity'))==0) for v in (L or [])))
+        out["has_oos_variants"]      = df[col].apply(lambda L: any((isinstance(v, dict) and _clean_number(v.get('available_quantity'))==0) for v in _safe_iterable(L)))
         out["any_positive_stock"]    = out["stock_total_available"] > 0
 
         out["sold_total"] = solds.apply(lambda xs: np.sum(xs) if xs else 0.0)
@@ -596,13 +647,13 @@ class VariationsFeatureBuilder(FrozenTransformer):
         out["price_mean_weighted_by_avail"] = df[col].apply(self._aw_mean)
 
         # picture_ids per variation
-        pics_counts = df[col].apply(lambda L: [len(v.get('picture_ids', [])) if isinstance(v, dict) and isinstance(v.get('picture_ids'), list) else 0 for v in (L or [])])
+        pics_counts = df[col].apply(lambda L: [len(v.get('picture_ids', [])) if isinstance(v, dict) and isinstance(v.get('picture_ids'), list) else 0 for v in _safe_iterable(L)])
         out["pictures_total"] = pics_counts.apply(lambda xs: np.sum(xs) if xs else 0)
         out["pictures_mean_per_variation"] = pics_counts.apply(lambda xs: _safe_stat(xs, mean, 0.0))
         out["pictures_max_per_variation"]  = pics_counts.apply(lambda xs: _safe_stat(xs, max, 0))
         out["pictures_min_per_variation"]  = pics_counts.apply(lambda xs: _safe_stat(xs, min, 0))
 
-        out["custom_fields_nonnull_count"] = df[col].apply(lambda L: sum(1 for v in (L or []) if isinstance(v, dict) and v.get('seller_custom_field') not in (None,"",np.nan)))
+        out["custom_fields_nonnull_count"] = df[col].apply(lambda L: sum(1 for v in _safe_iterable(L) if isinstance(v, dict) and v.get('seller_custom_field') not in (None,"",np.nan)))
         out["has_any_custom_field"] = out["custom_fields_nonnull_count"] > 0
 
         # attribute-level summaries
@@ -678,7 +729,7 @@ def _row_attr_summaries(attr_list):
     empty_vals = 0
     total_items = 0
 
-    for a in (attr_list or []):
+    for a in _safe_iterable(attr_list):
         if not isinstance(a, dict):
             continue
         aname = a.get('name')
@@ -797,7 +848,7 @@ class AttributesFeatureBuilder(FrozenTransformer):
 
         group_cols={}
         group_counts_per_row = df[col].apply(
-            lambda L: Counter(a.get('attribute_group_name') for a in (L or []) if isinstance(a, dict) and a.get('attribute_group_name') is not None)
+            lambda L: Counter(a.get('attribute_group_name') for a in _safe_iterable(L) if isinstance(a, dict) and a.get('attribute_group_name') is not None)
             if not (isinstance(L, float) and np.isnan(L)) else Counter()
         )
         for g in (self.top_groups_ or []):
@@ -847,10 +898,10 @@ class TagsFeatureBuilder(FrozenTransformer):
         col=self.col
         tags=set()
         for L in df[col]:
-            for t in _safe_list(L):
+            for t in _safe_iterable(L):
                 tags.add(t)
         self.known_tags_=sorted(tags)
-        combos = df[col].apply(lambda L: tuple(sorted(set(_safe_list(L)))))
+        combos = df[col].apply(lambda L: tuple(sorted(set(_safe_iterable(L)))))
         self.top_combos_ = list(combos.value_counts().head(self.top_combo_k).index)
         return self
 
@@ -863,7 +914,7 @@ class TagsFeatureBuilder(FrozenTransformer):
         tag_cols={}
         # one-hot every known tag from train (small set)
         for t in self.known_tags_:
-            tag_cols[f"tag__{t}"] = df[col].apply(lambda L, t=t: (t in set(_safe_list(L))))
+            tag_cols[f"tag__{t}"] = df[col].apply(lambda L, t=t: (t in set(_safe_iterable(L))))
 
         # semantic rolls
         has_dragged = (tag_cols.get("tag__dragged_bids_and_visits", pd.Series(False, index=df.index)) |
@@ -885,11 +936,11 @@ class TagsFeatureBuilder(FrozenTransformer):
         W = self.tag_weights if self.tag_weights is not None else default_weights
         def exposure_score(L):
             s=0.0
-            for t in set(_safe_list(L)): s += float(W.get(t,0.0))
+            for t in set(_safe_iterable(L)): s += float(W.get(t,0.0))
             return s
         tag_cols["tags_exposure_score"] = df[col].apply(exposure_score).astype(np.float32)
 
-        combos = df[col].apply(lambda L: tuple(sorted(set(_safe_list(L)))))
+        combos = df[col].apply(lambda L: tuple(sorted(set(_safe_iterable(L)))))
         combo_cols={}
         combo_cols["tags_combo_key"] = combos.apply(lambda t: "EMPTY" if not t else "+".join(t))
         combo_cols["tags_has_popular_combo"] = combos.isin(self.top_combos_)
@@ -935,7 +986,7 @@ def _parse_size(s):
 
 def _dims_list(pic_list, key="size"):
     out=[]
-    for p in (pic_list or []):
+    for p in _safe_iterable(pic_list):
         if not isinstance(p, dict): continue
         w,h=_parse_size(p.get(key))
         if not (np.isnan(w) or np.isnan(h)): out.append((w,h))
@@ -967,7 +1018,7 @@ class PicturesFeatureBuilder(FrozenTransformer):
         base["has_pictures"]   = df[col].apply(lambda L: isinstance(L, list) and len(L)!=0)
         base["pictures_count"] = df[col].apply(lambda L: len(L) if isinstance(L, list) else 0)
 
-        pic_ids = df[col].apply(lambda L: [p.get("id") for p in (L or []) if isinstance(p, dict) and isinstance(p.get("id"), str)])
+        pic_ids = df[col].apply(lambda L: [p.get("id") for p in _safe_iterable(L) if isinstance(p, dict) and isinstance(p.get("id"), str)])
         base["pictures_unique_ids"] = pic_ids.apply(lambda arr: len(set(arr)))
         base["pictures_dup_rate"]   = ((base["pictures_count"] - base["pictures_unique_ids"]) / base["pictures_count"].replace(0, np.nan)).fillna(0.0)
 
@@ -1054,13 +1105,13 @@ class PicturesFeatureBuilder(FrozenTransformer):
         size_cols["first_is_landscape"] = first_w > first_h
         size_cols["first_is_square"]    = (first_w == first_h) & first_w.notna()
 
-        secure_present = df[col].apply(lambda L: sum(1 for p in (L or []) if isinstance(p, dict) and isinstance(p.get("secure_url"), str) and p.get("secure_url","").startswith("https://")))
-        plain_present  = df[col].apply(lambda L: sum(1 for p in (L or []) if isinstance(p, dict) and isinstance(p.get("url"), str) and p.get("url","").startswith("http://")))
+        secure_present = df[col].apply(lambda L: sum(1 for p in _safe_iterable(L) if isinstance(p, dict) and isinstance(p.get("secure_url"), str) and p.get("secure_url","").startswith("https://")))
+        plain_present  = df[col].apply(lambda L: sum(1 for p in _safe_iterable(L) if isinstance(p, dict) and isinstance(p.get("url"), str) and p.get("url","").startswith("http://")))
         size_cols["pic_secure_count"] = secure_present.astype("int32")
         size_cols["pic_plain_count"]  = plain_present.astype("int32")
         size_cols["pic_secure_share"] = (secure_present / base["pictures_count"].replace(0, np.nan)).fillna(0.0)
 
-        hosts = df[col].apply(lambda L: {_host(p.get("secure_url") or p.get("url","")) for p in (L or []) if isinstance(p, dict)} if not (isinstance(L, float) and np.isnan(L)) else set())
+        hosts = df[col].apply(lambda L: {_host(p.get("secure_url") or p.get("url","")) for p in _safe_iterable(L) if isinstance(p, dict)} if not (isinstance(L, float) and np.isnan(L)) else set())
         size_cols["pic_host_unique_count"] = hosts.apply(len)
         size_cols["pic_has_non_mlstatic_host"] = hosts.apply(lambda s: any(("mlstatic.com" not in h) for h in s if h))
 
