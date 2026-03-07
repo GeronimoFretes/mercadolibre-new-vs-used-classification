@@ -24,8 +24,23 @@ TARGET = "condition"
 df_train = pd.read_parquet(
     TRAIN_DATA_PATH, 
      
-    convert_dates=DATE_COLS
+    
 )
+
+'''
+Traceback (most recent call last):
+  File "/home/runner/work/mercadolibre-new-vs-used-classification/mercadolibre-new-vs-used-classification/build_processed_data.py", line 24, in <module>
+    df_train = pd.read_parquet(
+               ^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/pandas/io/parquet.py", line 669, in read_parquet
+    return impl.read(
+           ^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/pandas/io/parquet.py", line 265, in read
+    pa_table = self.api.parquet.read_table(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: read_table() got an unexpected keyword argument 'convert_dates'
+'''
+
 
 df_train = df_train.drop(columns=COLS_TO_DROP_EARLY).copy()
 
