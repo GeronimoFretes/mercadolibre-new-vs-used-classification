@@ -12,7 +12,7 @@ from preprocessing.pipeline_io import save_pipeline, load_pipeline
 artifacts = Path('artifacts')
 artifacts.mkdir(parents=True, exist_ok=True)
 
-TRAIN_DATA_PATH = 'data/train_data.jsonlines'
+TRAIN_DATA_PATH = 'data/train_data.parquet'
 
 PIPELINE_PATH = artifacts / 'prep_v1'
 USE_LOCAL_PIPELINE = True
