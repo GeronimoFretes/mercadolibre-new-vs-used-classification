@@ -1,0 +1,10 @@
+numpy>=1.26,<3.0
+pandas>=2.2,<3.0
+scikit-learn>=1.1,<1.8
+catboost>=1.2.7,<2.0
+optuna>=4.3,<5.0
+joblib>=1.4,<2.0
+pyarrow>=17,<24
+psycopg2-binary>=2.9,<3.0
+notebook>=7,<8
+ipykernel>=6,<7
