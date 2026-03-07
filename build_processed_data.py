@@ -21,7 +21,7 @@ COLS_TO_DROP_EARLY = ['subtitle','differential_pricing','international_delivery_
 DATE_COLS = ['date_created','last_updated']
 TARGET = "condition"
 
-df_train = pd.read_json(
+df_train = pd.read_parquet(
     TRAIN_DATA_PATH, 
     lines=True, 
     convert_dates=DATE_COLS
