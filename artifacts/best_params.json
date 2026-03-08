@@ -1,0 +1,11 @@
+{
+  "depth": 7,
+  "l2_leaf_reg": 30.206492591943,
+  "learning_rate": 0.0226940853071826,
+  "random_strength": 5.70427449106795,
+  "min_data_in_leaf": 185,
+  "border_count": 121,
+  "subsample": 0.886336894885607,
+  "rsm": 0.922629694300833,
+  "weighting_mode": "auto_balanced"
+}
