@@ -1,23 +1,21 @@
-# Mercado Libre Listing Condition Classification  
-#### New vs Used prediction with CatBoost, custom preprocessing, cross-validation, and hyperparameter tuning
+# Mercado Libre New vs Used Classification
 
-This repository contains a machine learning project focused on classifying Mercado Libre listings as **`new`** or **`used`** using a **CatBoost** model trained on tabular and semi-structured product listing data.
+Applied machine learning project for classifying Mercado Libre listings as **`new`** or **`used`** using a **CatBoost** model trained on tabular and semi-structured marketplace data.
 
-The project combines:
+This repository is structured as a reusable ML workflow and it includes:
 
-- a custom preprocessing and feature engineering pipeline,
-- cross-validated model training,
-- hyperparameter optimization with **Optuna**,
-- frozen preprocessing artifacts for reproducible inference,
-- and exported study artifacts for transparency and auditability.
-
-It was developed as an academic machine learning project and is presented here as part of my technical portfolio.
+- custom preprocessing and feature engineering
+- CatBoost training with cross-validation
+- Optuna-based hyperparameter tuning
+- saved evaluation artifacts from out-of-fold predictions
+- fast inference with pre-trained models distributed through **GitHub Releases**
+- an optional GitHub Actions workflow for long-running experiments
 
 ---
 
 ## Project overview
 
-Online marketplace listings often contain noisy, incomplete, and semi-structured information. In this project, I approached the problem of classifying listings into **new vs used** by going beyond standard tabular modeling and extracting signal from multiple nested fields such as:
+Marketplace listings combine structured fields with noisy text and nested metadata. In this project, I built a classification pipeline that predicts whether a listing corresponds to a **new** or **used** product by extracting signal from fields such as:
 
 - `attributes`
 - `shipping`
@@ -27,92 +25,20 @@ Online marketplace listings often contain noisy, incomplete, and semi-structured
 - `pictures`
 - `descriptions`
 
-The goal was to build a robust classification pipeline that could transform this raw marketplace data into meaningful features and use them effectively in a high-performance gradient boosting model.
+The goal was to build a realistic applied ML workflow: robust preprocessing, strong tabular modeling, careful evaluation, and a clean inference path.
 
 ---
 
-## Main components
+## What makes this project interesting
 
-### 1. Custom preprocessing and feature engineering
+This is more than a basic classifier. The project includes:
 
-A dedicated preprocessing pipeline was built to:
-
-- load raw `.parquet` listing data,
-- clean and normalize fields,
-- transform nested and semi-structured columns,
-- create derived features,
-- preserve the final feature schema,
-- and ensure consistency between training and inference.
-
-Feature engineering includes signals derived from:
-
-- listing title text
-- price bins
-- warranty content
-- shipping information
-- product variations
-- attribute combinations
-- listing tags
-- image-related metadata
-- description presence
-- category and seller-related information
-
-This makes the project much more than a basic tabular classification task.
-
----
-
-### 2. Model training with CatBoost
-
-The final classifier is based on **CatBoost**, which is especially well suited for tabular datasets with categorical variables and mixed feature types.
-
-The training setup includes:
-
-- cross-validation,
-- fold-level training,
-- out-of-fold predictions,
-- threshold selection,
-- optional calibration support in the training pipeline,
-- and artifact export for downstream inference.
-
----
-
-### 3. Hyperparameter tuning with Optuna
-
-Hyperparameter optimization was performed with **Optuna**, searching over parameters such as:
-
-- tree depth
-- learning rate
-- regularization strength
-- subsampling
-- random strength
-- feature sampling
-- class weighting strategies
-
-The original study was stored in a private database during experimentation, but the relevant public artifacts are now included in this repository so the project can be executed without access to any private infrastructure.
-
----
-
-## Reproducibility note
-
-This repository now includes the files required to reproduce the **public training and inference workflow**:
-
-- frozen preprocessing pipeline
-- best hyperparameters
-- Optuna study summary
-- Optuna trials export
-- original train and test datasets
-
-That said, I do **not** claim exact bit-for-bit reproducibility of the original results across all environments. Small differences may appear depending on:
-
-- package versions,
-- operating system,
-- execution order,
-- CatBoost internal behavior,
-- or other environment-specific details.
-
-For that reason, this README intentionally does **not** report a fixed accuracy score as a guaranteed reproducible benchmark from the public repo alone.
-
-The repository should be understood as **fully executable and highly reproducible in workflow**, but not necessarily guaranteed to reproduce the exact same final metric obtained in my original development environment.
+- **feature engineering over nested marketplace data**
+- **frozen preprocessing for training/inference consistency**
+- **cross-validated CatBoost training**
+- **Optuna tuning with exported study artifacts**
+- **artifact-based evaluation without retraining**
+- **release-based distribution of pre-trained models**
 
 ---
 
@@ -120,192 +46,164 @@ The repository should be understood as **fully executable and highly reproducibl
 
 ```text
 mercadolibre-new-vs-used-classification/
+├── .github/workflows/optuna.yml
 ├── artifacts/
 │   ├── prep_v1/
 │   │   ├── pipeline.joblib
 │   │   └── schema.json
+│   ├── models/
+│   │   └── .gitkeep
 │   ├── best_params.json
 │   ├── study_best.json
-│   └── optuna_trials.csv
+│   ├── optuna_trials.csv
+│   ├── oof.parquet
+│   └── metrics.json
 ├── data/
 │   ├── train_data.parquet
-│   └── test_data.parquet
+│   ├── test_data.parquet
 ├── preprocessing/
 │   ├── pipeline_io.py
 │   └── preprocess_pipeline.py
-├── 01-entrenar_guardar_modelo_final.ipynb
-├── 02-aplicar_modelo_final_test.ipynb
+├── scripts/
+│   ├── download_models.py
+├── build_processed_data.py
 ├── train_catboost_optuna.py
-├── LICENSE
-└── .gitignore
+├── 01_train_final_model.ipynb
+├── 02_evaluate_model.py
+├── 03_batch_inference_unlabeled_data.py
+├── requirements.txt
+└── README.md
 ```
 
 ---
 
-## Public artifacts included
+## Quick start
 
-To remove the dependency on my private Optuna storage, the repository now includes:
+### 1. Clone the repository
 
-### `artifacts/prep_v1/`
+```bash
+git clone https://github.com/GeronimoFretes/mercadolibre-new-vs-used-classification.git
+cd mercadolibre-new-vs-used-classification
+```
 
-Frozen preprocessing pipeline and schema used to transform the raw dataset consistently.
+### 2. Install dependencies
 
-### `artifacts/best_params.json`
+```bash
+pip install -r requirements.txt
+```
 
-Best hyperparameters used for the final model training.
+### 3. Download pre-trained models
 
-### `artifacts/study_best.json`
+```bash
+python scripts/download_models.py
+```
 
-Summary of the best Optuna trial and main study outcome.
+### 4. Run inference
 
-### `artifacts/optuna_trials.csv`
+Open:
 
-Exported trial history from the Optuna study, allowing others to inspect the tuning process.
+```text
+03_batch_inference_unlabeled_data.ipynb
+```
 
-### `data/train_data.parquet` and `data/test_data.parquet`
-
-Original datasets used for training and inference.
-
----
-
-## Workflow
-
-### Training workflow
-
-The notebook `01-entrenar_guardar_modelo_final.ipynb` handles the final training process:
-
-1. Load the training dataset
-2. Apply the preprocessing pipeline
-3. Transform raw listing data into model-ready features
-4. Load the best hyperparameters
-5. Train CatBoost with cross-validation
-6. Save the resulting artifacts for inference
+This is the fastest way to try the project without retraining the full model stack.
 
 ---
 
-### Inference workflow
+## Training workflow
 
-The notebook `02-aplicar_modelo_final_test.ipynb` applies the saved pipeline and trained model(s) to the test set:
+To reproduce the public training workflow:
 
-1. Load test data
-2. Load the frozen preprocessing pipeline
-3. Transform the test set using the same schema as training
-4. Generate predictions
-5. Export the final submission-ready output
+### Build processed training data
+
+```bash
+python build_processed_data.py
+```
+
+### Train the final model workflow
+
+Open:
+
+```text
+01_train_final_model.ipynb
+```
+
+This generates the main training artifacts, including:
+
+* out-of-fold predictions
+* evaluation metrics
+* feature importances
+* fold models
+* inference configuration
 
 ---
 
-## Why this project is interesting
+## Evaluation workflow
 
-What makes this project especially valuable from a machine learning perspective is that it is not just about fitting a model to clean structured data.
+To summarize model performance from saved training artifacts:
 
-It involves:
+```bash
+python 02_evaluate_model.py
+```
 
-* dealing with real-world marketplace data,
-* extracting signal from nested fields,
-* designing a reusable preprocessing pipeline,
-* managing training/inference consistency,
-* tuning a strong gradient boosting model,
-* and packaging the whole workflow into a repository that others can execute.
+This script does **not** retrain the model. It reads the saved out-of-fold predictions and metrics to produce a clean evaluation summary.
 
-This reflects a more realistic applied ML workflow than a simple notebook-based classification experiment.
+---
+
+## Pre-trained models
+
+The full fold models are **not stored directly in Git history** because of file size constraints.
+
+Instead, they are distributed through **GitHub Releases** and downloaded into:
+
+```text
+artifacts/models/
+```
+
+This keeps the repository lightweight while still supporting fast inference.
+
+---
+
+## Optuna workflow
+
+The repository also includes an optional automated experimentation workflow:
+
+```text
+.github/workflows/optuna.yml
+```
+
+This workflow is intended for long-running Optuna studies and is separate from the main public execution path.
+
+It is useful for experimentation, but not required for:
+
+* quick inference
+* evaluation
+* or the main training workflow
+
+---
+
+## Reproducibility note
+
+This repository is designed to be:
+
+* **fully executable**
+* **transparent in methodology**
+* **strongly reproducible in workflow**
+
+Exact numeric replication across environments is not guaranteed due to differences in package versions, operating systems, and model execution details.
 
 ---
 
 ## Tech stack
 
-* **Python**
-* **Pandas**
-* **NumPy**
-* **scikit-learn**
-* **CatBoost**
-* **Optuna**
-* **joblib**
-
----
-
-## How to run the project
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/GeronimoFretes/entrega_tp3_ap_2025Q2.git
-cd entrega_tp3_ap_2025Q2
-```
-
-### 2. Install dependencies
-
-Install the required Python libraries used throughout the project.
-A dedicated environment is recommended.
-
-Example:
-
-```bash
-pip install pandas numpy scikit-learn catboost optuna joblib pyarrow
-```
-
-Depending on your setup, you may also need Jupyter:
-
-```bash
-pip install notebook
-```
-
----
-
-### 3. Run training
-
-Open and execute:
-
-```bash
-01-entrenar_guardar_modelo_final.ipynb
-```
-
-This notebook loads the training data, applies the preprocessing pipeline, reads the saved best hyperparameters, and trains the model.
-
----
-
-### 4. Run inference
-
-Open and execute:
-
-```bash
-02-aplicar_modelo_final_test.ipynb
-```
-
-This notebook applies the frozen preprocessing pipeline and the trained model to the test dataset.
-
----
-
-## Notes on exact replication
-
-The repository is designed so that another user can:
-
-* inspect the full workflow,
-* understand the feature engineering logic,
-* retrain the model,
-* run inference,
-* and audit the tuning process.
-
-However, this should not be interpreted as a guarantee of identical final scores under every environment.
-
-For that reason, this repository is best viewed as:
-
-* **fully executable**
-* **transparent in methodology**
-* **strongly reproducible in process**
-* but **not guaranteed to be numerically identical in every run**
-
----
-
-## Potential future improvements
-
-Some natural next steps for improving the project would be:
-
-* adding a `requirements.txt` or `pyproject.toml`,
-* packaging the training pipeline into a CLI or modular training script,
-* logging experiments more formally,
-* documenting the final feature set in more detail,
-* and including a dedicated results section with environment-specific benchmark values.
+* Python
+* Pandas
+* NumPy
+* scikit-learn
+* CatBoost
+* Optuna
+* joblib
+* GitHub Actions
 
 ---
 
@@ -313,19 +211,4 @@ Some natural next steps for improving the project would be:
 
 **Gerónimo Fretes**
 
-Data Science / Machine Learning student at ITBA, with a strong interest in applied ML, structured problem solving, and production-oriented modeling workflows.
-
-This repository is part of my academic and technical portfolio.
-
----
-
-```
-
-A small recommendation: for portfolio purposes, I would rename the title from the current academic-style repo name inside the README heading, even if the repository URL stays the same. For example:
-
-- **Mercado Libre Listing Condition Classification**
-- **New vs Used Classification for Marketplace Listings**
-- **Mercado Libre New vs Used Prediction with CatBoost**
-
-The repo can still be called `entrega_tp3_ap_2025Q2`, but the README title should feel more professional and self-explanatory.
-```
+Data Science student at ITBA, focused on applied ML, structured problem solving, and production-oriented workflows.
